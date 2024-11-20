@@ -1,0 +1,18 @@
+# Виртуальное окружение
+venv/
+ENV/
+env/
+.venv/
+
+# Логи
+logs/
+*.log
+
+# Базы данных
+*.db
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/

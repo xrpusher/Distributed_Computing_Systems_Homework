@@ -1,5 +1,4 @@
-# main.py
-
+import os
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, validator, ValidationError
@@ -18,9 +17,6 @@ class NumberInput(BaseModel):
         if v < 0:
             raise ValueError("Число должно быть натуральным (больше или равно 0).")
         return v
-
-# Остальной код остается без изменений
-
 
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request: Request, exc: ValidationError):
@@ -52,19 +48,15 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 @app.post("/process_number")
 async def process_number_endpoint(request: Request):
     try:
-        # Получаем JSON из тела запроса
         data = await request.json()
     except json.decoder.JSONDecodeError:
-        # Если JSON некорректен
         return JSONResponse(
             status_code=400,
             content={"detail": "Некорректный JSON в теле запроса."}
         )
     try:
-        # Валидируем данные с помощью Pydantic
         input_data = NumberInput(**data)
     except ValidationError as ve:
-        # Обрабатываем ошибки валидации
         errors = ve.errors()
         error_messages = []
         for error in errors:
@@ -80,10 +72,11 @@ async def process_number_endpoint(request: Request):
         result = process_number(number)
         return {"result": result}
     except HTTPException as e:
-        # Обрабатываем исключения, вызванные бизнес-логикой
         raise e
     except Exception as e:
-        # Обрабатываем непредвиденные ошибки
+        # Логируем исключение
+        traceback_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+        print(f"An error occurred: {traceback_str}")
         return JSONResponse(
             status_code=500,
             content={"detail": "Внутренняя ошибка сервера."}

@@ -1,52 +1,43 @@
 # database.py
 
-import sqlite3
+import psycopg2
 import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Загружает переменные из .env
 
 class Database:
     def __init__(self):
-        self.db_path = 'numbers.db'
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = psycopg2.connect(
+            dbname=os.getenv('DB_NAME', 'mydatabase'),
+            user=os.getenv('DB_USER', 'myuser'),
+            password=os.getenv('DB_PASSWORD', 'mypassword'),
+            host=os.getenv('DB_HOST', 'localhost'),
+            port=os.getenv('DB_PORT', '5434')  # Убедитесь, что порт правильный
+        )
         self.create_table()
 
     def create_table(self):
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS numbers (
-                number INTEGER PRIMARY KEY
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS max_number (
-                id INTEGER PRIMARY KEY,
-                number INTEGER
-            )
-        ''')
-        self.conn.commit()
+        with self.conn.cursor() as cursor:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS numbers (
+                    number INTEGER PRIMARY KEY
+                )
+            ''')
+            self.conn.commit()
 
     def is_number_processed(self, number: int) -> bool:
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT 1 FROM numbers WHERE number = ?', (number,))
-        return cursor.fetchone() is not None
+        with self.conn.cursor() as cursor:
+            cursor.execute('SELECT 1 FROM numbers WHERE number = %s', (number,))
+            return cursor.fetchone() is not None
 
-    def is_number_minus_one_of_max(self, number: int) -> bool:
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT number FROM max_number WHERE id = 1')
-        row = cursor.fetchone()
-        if row:
-            max_number = row[0]
-            return number == max_number - 1
-        return False
+    def is_number_minus_one_of_processed(self, number: int) -> bool:
+        with self.conn.cursor() as cursor:
+            # Проверяем, есть ли число, которое равно number + 1
+            cursor.execute('SELECT 1 FROM numbers WHERE number = %s', (number + 1,))
+            return cursor.fetchone() is not None
 
     def add_number(self, number: int):
-        cursor = self.conn.cursor()
-        cursor.execute('INSERT OR IGNORE INTO numbers (number) VALUES (?)', (number,))
-        cursor.execute('SELECT number FROM max_number WHERE id = 1')
-        row = cursor.fetchone()
-        if row:
-            current_max = row[0]
-            if number > current_max:
-                cursor.execute('UPDATE max_number SET number = ? WHERE id = 1', (number,))
-        else:
-            cursor.execute('INSERT INTO max_number (id, number) VALUES (1, ?)', (number,))
-        self.conn.commit()
+        with self.conn.cursor() as cursor:
+            cursor.execute('INSERT INTO numbers (number) VALUES (%s) ON CONFLICT DO NOTHING', (number,))
+            self.conn.commit()

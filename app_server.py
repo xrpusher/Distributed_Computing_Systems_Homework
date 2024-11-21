@@ -23,7 +23,7 @@ def process_number(number: int) -> int:
         message = f"Исключительная ситуация #1: Число {number} уже поступало ранее."
         logger.error(message)
         raise HTTPException(status_code=400, detail="Число уже поступало ранее.")
-    if db.is_number_minus_one_of_max(number):
+    if db.is_number_minus_one_of_processed(number):
         message = f"Исключительная ситуация #2: Число {number} на единицу меньше уже обработанного числа."
         logger.error(message)
         raise HTTPException(status_code=400, detail="Число на единицу меньше уже обработанного числа.")

@@ -10,7 +10,7 @@ logs/
 
 # Базы данных
 *.db
-.env/
+*.env/
 
 # PyCharm
 .idea/

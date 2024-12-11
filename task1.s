@@ -1,162 +1,121 @@
-.equ RAMEND, 0x5F  ; Define RAMEND for ATmega8
+;------------------------------------------
+; Константы и настройки
+;------------------------------------------
+        .include "m8def.inc"       ; Включаем стандартный header для ATmega8
 
-; Define USART registers with I/O addresses
-.equ UCSRB, 0x0A    ; I/O address for UCSRB
-.equ UCSRA, 0x0B    ; I/O address for UCSRA
-.equ UCSRC, 0x20    ; I/O address for UCSRC
-.equ TXEN, 3
-.equ URSEL, 7
-.equ UCSZ1, 2 
-.equ UCSZ0, 1
-.equ UDRE, 5
-.equ UDR, 0x0C      ; I/O address for UDR
+        .equ F_CPU = 16000000
+        .equ BAUD = 9600
+        ; UBRR = (F_CPU/(16*BAUD))-1
+        .equ UBRR_VALUE = ((F_CPU/(16*BAUD))-1)
 
-; Define Timer1 registers
-.equ TCCR1B, 0x0E    ; I/O address for TCCR1B
-.equ TIMSK, 0x19      ; I/O address for TIMSK
-.equ OCR1AH, 0x2B     ; Data address for OCR1AH
-.equ OCR1AL, 0x2A     ; Data address for OCR1AL
-.equ OCIE1A, 4
+        .equ TIMER1_INTERVAL = 62500 ; Примерно 1с при prescaler=256 (16МГц)
+        .equ TIMER2_INTERVAL = 250   ; Пример, интервал для Timer2 (CTC)
 
-; Define Timer0 registers
-.equ TCCR0, 0x16      ; I/O address for TCCR0
-.equ OCR0, 0x17       ; I/O address for OCR0
-.equ OCIE0, 1         ; Bit for Timer0 Compare Match Interrupt Enable
+        .def temp = r16
+        .def str_ptr_lo = r30
+        .def str_ptr_hi = r31
 
-; Define Timer1 operation modes and clock select bits
-.equ WGM12, 3
-.equ CS12, 2
-.equ CS10, 0
+        .cseg
+        .org 0x0000
+        rjmp main
+        .org OC1Aaddr
+        rjmp TIMER1_COMPA_vect
+        .org OC2addr
+        rjmp TIMER2_COMP_vect
 
-; Define Timer0 operation modes and clock select bits
-.equ WGM01, 1
-.equ CS02, 2
-.equ CS01, 1
-.equ CS00, 0
+;------------------------------------------
+; Секции данных
+;------------------------------------------
+        .dseg
+ping_str: .db "ping\r\n",0
+pong_str: .db "pong\r\n",0
 
-; Define PORTB registers
-.equ PORTB, 0x05      ; I/O address for PORTB
-.equ DDRB, 0x04       ; I/O address for DDRB
-.equ PB0, 0           ; Bit 0 of PORTB
-
-; Define F_CPU
-.equ F_CPU, 16000000
-
-; Define timer intervals
-.equ TIMER1_INTERVAL, 500
-.equ TIMER0_INTERVAL, 200  ; Set <= 255 for 8-bit Timer0
-
-.global main
-.global TIMER1_COMPA_vect
-.global TIMER0_COMP_vect
-.global timer0_overflow_count
-
-.section .data
-timer0_overflow_count:
-    .byte 1
-
-.section .text
-
+;------------------------------------------
+; Код программы
+;------------------------------------------
+        .cseg
 main:
-    ; Инициализация стека
-    ldi r16, 0x00          ; hi8(RAMEND)
-    out 0x3E, r16          ; SPH
-    ldi r16, 0x5F          ; lo8(RAMEND)
-    out 0x3D, r16          ; SPL
+        ; Инициализация стека
+        ldi temp, high(RAMEND)
+        out SPH, temp
+        ldi temp, low(RAMEND)
+        out SPL, temp
 
-    ; Настройка USART
-    ldi r16, (1<<TXEN)
-    out UCSRB, r16
-    ldi r16, (1<<URSEL) | (1<<UCSZ1) | (1<<UCSZ0)
-    sts UCSRC, r16          ; UCSRC
+        ; Настройка USART (8N1, например на 9600 бод)
+        ldi temp, high(UBRR_VALUE)
+        out UBRRH, temp
+        ldi temp, low(UBRR_VALUE)
+        out UBRR, temp
+        ldi temp, (1<<RXEN)|(1<<TXEN) ; Включаем RX и TX
+        out UCSRB, temp
+        ldi temp, (1<<URSEL)|(1<<UCSZ1)|(1<<UCSZ0) ; 8 бит, 1 стоп-бит
+        out UCSRC, temp
 
-    ; Настройка Timer1
-    ldi r16, (1<<WGM12)
-    out TCCR1B, r16
-    ldi r16, lo8(TIMER1_INTERVAL)
-    sts OCR1AL, r16          ; Using 'sts' to access OCR1AL
-    ldi r16, hi8(TIMER1_INTERVAL)
-    sts OCR1AH, r16          ; Using 'sts' to access OCR1AH
-    ldi r16, (1<<OCIE1A) | (1<<CS12) | (1<<CS10)
-    out TIMSK, r16
+        ; Настройка Timer1 в режиме CTC
+        ; Prescaler 256, сравнение с OCR1A
+        ldi temp, high(TIMER1_INTERVAL)
+        sts OCR1AH, temp
+        ldi temp, low(TIMER1_INTERVAL)
+        sts OCR1AL, temp
+        ldi temp, (1<<WGM12)|(1<<CS12) ; CTC Mode, prescaler = 256
+        out TCCR1B, temp
 
-    ; Настройка Timer0
-    ldi r16, (1<<WGM01)     ; CTC Mode
-    out TCCR0, r16
-    ldi r16, TIMER0_INTERVAL
-    out OCR0, r16
-    ldi r16, (1<<OCIE0) | (1<<CS02) | (1<<CS00) ; Enable Compare Match Interrupt, Prescaler 1024
-    out TIMSK, r16
+        ; Включаем прерывание по совпадению Timer1
+        ldi temp, (1<<OCIE1A)
+        out TIMSK, temp
 
-    ; Настройка PORTB0 как выход
-    ldi r16, (1<<PB0)
-    out DDRB, r16
+        ; Настройка Timer2 в режиме CTC
+        ; Prescaler 1024 для примера
+        ldi temp, TIMER2_INTERVAL
+        out OCR2, temp
+        ldi temp, (1<<WGM21)|(1<<CS22)|(1<<CS20) ; CTC, prescaler 1024
+        out TCCR2, temp
 
-    ; Инициализация счётчика переполнений Timer0
-    clr r16
-    sts timer0_overflow_count, r16
+        ; Включаем прерывание по совпадению Timer2
+        in temp, TIMSK
+        ori temp, (1<<OCIE2)
+        out TIMSK, temp
 
-    ; Разрешение прерываний
-    sei
+        sei
 
-loop:
-    rjmp loop
+main_loop:
+        rjmp main_loop
 
-; Interrupt Service Routine for Timer1 Compare Match A
-TIMER1_COMPA_vect:
-    push r30
-    push r31
-    ldi r30, lo8(ping_str)
-    ldi r31, hi8(ping_str)
-    rcall send_string
-    pop r31
-    pop r30
-    reti
-
-; Interrupt Service Routine for Timer0 Compare Match
-TIMER0_COMP_vect:
-    ; Обновление счётчика переполнений Timer0
-    lds r16, timer0_overflow_count
-    inc r16
-    sts timer0_overflow_count, r16
-    cpi r16, 4             ; 4 * 200 = 800 (~48ms)
-    brne skip_pong
-    clr r16                ; Сброс счётчика
-    sts timer0_overflow_count, r16
-    push r30
-    push r31
-    ldi r30, lo8(pong_str)
-    ldi r31, hi8(pong_str)
-    rcall send_string
-    pop r31
-    pop r30
-skip_pong:
-    reti
-
+;------------------------------------------
+; Процедуры
+;------------------------------------------
 send_string:
-send_string_loop:
-    lpm r16, Z+
-    tst r16
-    breq send_done
-    rcall usart_send
-    rjmp send_string_loop
+        ld temp, Z+
+        tst temp
+        breq send_done
+wait_udr_empty:
+        sbis UCSRA, UDRE
+        rjmp wait_udr_empty
+        out UDR, temp
+        rjmp send_string
+
 send_done:
-    ret
+        ret
 
-usart_send:
-    sbis UCSRA, UDRE       ; Wait until the transmit buffer is empty
-    rjmp usart_send
-    out 0x0C, r16          ; UDR
-    ret
+;------------------------------------------
+; Обработчики прерываний
+;------------------------------------------
+TIMER1_COMPA_vect:
+        push r30
+        push r31
+        ldi r30, low(ping_str)
+        ldi r31, high(ping_str)
+        rcall send_string
+        pop r31
+        pop r30
+        reti
 
-.section .vectors
-.org 0x0000
-    rjmp main
-.org 0x000C  ; Address for Timer1 COMPA interrupt
-    rjmp TIMER1_COMPA_vect
-.org 0x0010  ; Address for Timer0 COMP interrupt
-    rjmp TIMER0_COMP_vect
-
-.section .rodata
-ping_str: .asciz "ping\r\n"
-pong_str: .asciz "pong\r\n"
+TIMER2_COMP_vect:
+        push r30
+        push r31
+        ldi r30, low(pong_str)
+        ldi r31, high(pong_str)
+        rcall send_string
+        pop r31
+        pop r30
+        reti

@@ -13,10 +13,10 @@ metadata:
   name: fastapi-config
   namespace: ns-37
 data:
-  DB_NAME: "mydatabase"
-  DB_USER: "myuser"
-  DB_HOST: "postgres-service"
-  DB_PORT: "5432"
+  DB_NAME: "${DB_NAME}"
+  DB_USER: "${DB_USER}"
+  DB_HOST: "${DB_HOST}"
+  DB_PORT: "${DB_PORT}"
 
 ---
 # 3) Secret (конфиденциальные данные)
@@ -27,8 +27,9 @@ metadata:
   namespace: ns-37
 type: Opaque
 data:
-  # Base64 от 'mypassword'
-  DB_PASSWORD: bXlwYXNzd29yZA==
+  # Здесь используем placeholder "${DB_PASSWORD_B64}"
+  # и при помощи envsubst или Helm вы подмените это реальным base64
+  DB_PASSWORD: "${DB_PASSWORD_B64}"
 
 ---
 # 4) Postgres Deployment + Service
@@ -53,23 +54,23 @@ spec:
       - name: postgres
         image: postgres:17
         ports:
-        - containerPort: 5432
+          - containerPort: 5432
         env:
-        - name: POSTGRES_DB
-          valueFrom:
-            configMapKeyRef:
-              name: fastapi-config
-              key: DB_NAME
-        - name: POSTGRES_USER
-          valueFrom:
-            configMapKeyRef:
-              name: fastapi-config
-              key: DB_USER
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: fastapi-secret
-              key: DB_PASSWORD
+          - name: POSTGRES_DB
+            valueFrom:
+              configMapKeyRef:
+                name: fastapi-config
+                key: DB_NAME
+          - name: POSTGRES_USER
+            valueFrom:
+              configMapKeyRef:
+                name: fastapi-config
+                key: DB_USER
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: fastapi-secret
+                key: DB_PASSWORD
         volumeMounts:
           - name: postgres-data
             mountPath: /var/lib/postgresql/data
@@ -128,7 +129,7 @@ spec:
     spec:
       containers:
       - name: fastapi-container
-        image: xrpusher/achiev_2_alisher:v1.0.0  # Или свой образ
+        image: xrpusher/achiev_2_alisher:v1.0.0
         ports:
           - containerPort: 8000
         envFrom:

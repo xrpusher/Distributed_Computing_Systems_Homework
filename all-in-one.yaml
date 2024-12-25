@@ -1,0 +1,176 @@
+---
+# 1) Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ns-37
+
+---
+# 2) ConfigMap (общие настройки)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fastapi-config
+  namespace: ns-37
+data:
+  DB_NAME: "mydatabase"
+  DB_USER: "myuser"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+
+---
+# 3) Secret (конфиденциальные данные)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fastapi-secret
+  namespace: ns-37
+type: Opaque
+data:
+  # Base64 от 'mypassword'
+  DB_PASSWORD: bXlwYXNzd29yZA==
+
+---
+# 4) Postgres Deployment + Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deployment
+  namespace: ns-37
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:17
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: fastapi-config
+              key: DB_NAME
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: fastapi-config
+              key: DB_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: fastapi-secret
+              key: DB_PASSWORD
+        volumeMounts:
+          - name: postgres-data
+            mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: ns-37
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+
+---
+# 5) PVC для Postgres
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: ns-37
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# 6) FastAPI Deployment + Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-deployment
+  namespace: ns-37
+  labels:
+    app: fastapi-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fastapi-app
+  template:
+    metadata:
+      labels:
+        app: fastapi-app
+    spec:
+      containers:
+      - name: fastapi-container
+        image: xrpusher/achiev_2_alisher:v1.0.0  # Или свой образ
+        ports:
+          - containerPort: 8000
+        envFrom:
+          - configMapRef:
+              name: fastapi-config
+          - secretRef:
+              name: fastapi-secret
+        command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-service
+  namespace: ns-37
+spec:
+  selector:
+    app: fastapi-app
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP
+
+---
+# 7) Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fastapi-ingress
+  namespace: ns-37
+  annotations:
+    haproxy.ingress.kubernetes.io/backend-max-connections: "1000"
+spec:
+  ingressClassName: haproxy
+  rules:
+    - host: ns-37.a.ru
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: fastapi-service
+              port:
+                number: 8000

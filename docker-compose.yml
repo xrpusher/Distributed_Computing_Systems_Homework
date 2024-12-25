@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   db:
     image: postgres:17
@@ -17,21 +19,21 @@ services:
       retries: 5
 
   fastapi:
-    image: xrpusher/achiev_2_alisher:v1.0.0
+    image: xrpusher/achiev_2_alisher:v1.0.1  # Используем последнюю версию
     container_name: fastapi_app
     depends_on:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8000:8000"  # Проброс порта приложения
     environment:
       DB_NAME: mydatabase
       DB_USER: myuser
       DB_PASSWORD: mypassword
-      DB_HOST: db  # Имя сервиса базы данных внутри Docker Compose
+      DB_HOST: db  # Имя сервиса базы данных внутри сети Docker Compose
       DB_PORT: 5432
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-    restart: always
+    restart: always  # Обеспечивает автоматический рестарт при сбое
 
 volumes:
   db_data:

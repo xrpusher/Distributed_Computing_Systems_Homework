@@ -8,7 +8,7 @@ metadata:
 spec:
   ingressClassName: haproxy
   rules:
-  - host: ns-37.ttm.ru
+  - host: ns-37.a.ru
     http:
       paths:
       - path: /

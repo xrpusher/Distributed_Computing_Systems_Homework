@@ -27,8 +27,6 @@ metadata:
   namespace: ns-37
 type: Opaque
 data:
-  # Здесь используем placeholder "${DB_PASSWORD_B64}"
-  # и при помощи envsubst или Helm вы подмените это реальным base64
   DB_PASSWORD: "${DB_PASSWORD_B64}"
 
 ---
@@ -107,7 +105,8 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: standard  # Укажите StorageClass вашего кластера
+  storageClassName: standard
+
 ---
 # 6) FastAPI Deployment + Service
 apiVersion: apps/v1
@@ -129,7 +128,7 @@ spec:
     spec:
       containers:
       - name: fastapi-container
-        image: xrpusher/achiev_2_alisher:v1.0.1  # Обновленный образ
+        image: xrpusher/achiev_2_alisher:v1.0.1
         ports:
           - containerPort: 8000
         envFrom:

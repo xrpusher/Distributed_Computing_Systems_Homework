@@ -3,14 +3,10 @@ from database import Database
 import logging
 import os
 
-# Создание директории для логов, если она не существует
-if not os.path.exists('logs'):
-    os.makedirs('logs')
-
 # Настройка логирования
 logger = logging.getLogger("app_logger")
 logger.setLevel(logging.ERROR)
-handler = logging.FileHandler("logs/app.log")
+handler = logging.StreamHandler()  # Логирование в stdout
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 handler.setFormatter(formatter)
 if not logger.handlers:

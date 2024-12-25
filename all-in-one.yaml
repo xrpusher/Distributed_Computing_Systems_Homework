@@ -107,7 +107,7 @@ spec:
   resources:
     requests:
       storage: 1Gi
-
+  storageClassName: standard  # Укажите StorageClass вашего кластера
 ---
 # 6) FastAPI Deployment + Service
 apiVersion: apps/v1
@@ -129,7 +129,7 @@ spec:
     spec:
       containers:
       - name: fastapi-container
-        image: xrpusher/achiev_2_alisher:v1.0.0
+        image: xrpusher/achiev_2_alisher:v1.0.1  # Обновленный образ
         ports:
           - containerPort: 8000
         envFrom:

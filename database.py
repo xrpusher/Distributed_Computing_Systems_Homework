@@ -13,7 +13,7 @@ class Database:
             user=os.getenv('DB_USER', 'myuser'),
             password=os.getenv('DB_PASSWORD', 'mypassword'),
             host=os.getenv('DB_HOST', 'localhost'),
-            port=os.getenv('DB_PORT', '5434')  # Убедитесь, что порт правильный
+            port=os.getenv('DB_PORT', '5432')  # Убедитесь, что порт правильный
         )
         self.create_table()
 

@@ -2,9 +2,6 @@
 
 import psycopg2
 import os
-from dotenv import load_dotenv
-
-load_dotenv()  # Загружает переменные из .env
 
 class Database:
     def __init__(self):
